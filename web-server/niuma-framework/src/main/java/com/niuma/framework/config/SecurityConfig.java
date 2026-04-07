@@ -123,6 +123,8 @@ public class SecurityConfig
                 requests.antMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 玩家资源，可匿名访问，走玩家资源的认证方式
                     .antMatchers("/player/**").permitAll()
+                    // 图片代理，可匿名访问
+                    .antMatchers("/proxy/**").permitAll()
                     // 静态资源，可匿名访问
                     .antMatchers(HttpMethod.GET, "/", "/*.html", "/**/*.html", "/**/*.css", "/**/*.js", "/profile/**").permitAll()
                     .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/*/api-docs", "/druid/**").permitAll()

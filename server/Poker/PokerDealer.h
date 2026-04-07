@@ -98,5 +98,9 @@ namespace NiuMa
 		virtual bool handOutCard(PokerCard& c, const DealFilter::Ptr& filter = nullptr);
 	};
 }
+                // 发出指定ID的牌
+                virtual bool handOutSpecificCard(PokerCard& c, int cardId);
+        };
+}
 
 #endif

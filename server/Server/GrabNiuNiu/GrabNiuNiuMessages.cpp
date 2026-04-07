@@ -1,44 +1,20 @@
+// GrabNiuNiuMessages.cpp
+
 #include "GrabNiuNiuMessages.h"
+#include "Network/NetMessage.h"
 
-namespace NiuMa {
+namespace NiuMa
+{
+	const std::string MsgGrabNiuSync::TYPE = "GrabNiuSync";
+	const std::string MsgGrabNiuSyncResp::TYPE = "GrabNiuSyncResp";
 
-	MsgGrabNiuSync::MsgGrabNiuSync() {
-		msgType = MSG_GRAB_NIU_SYNC;
+	void GrabNiuNiuMessages::registMessages()
+	{
+		NetMessage::registMessage(MsgGrabNiuSync::TYPE, []() {
+			return std::make_shared<MsgGrabNiuSync>();
+		});
+		NetMessage::registMessage(MsgGrabNiuSyncResp::TYPE, []() {
+			return std::make_shared<MsgGrabNiuSyncResp>();
+		});
 	}
-
-	MsgGrabNiuSync::~MsgGrabNiuSync() {}
-
-	MsgGrabNiuDeal4::MsgGrabNiuDeal4() {
-		msgType = MSG_GRAB_NIU_DEAL4;
-	}
-
-	MsgGrabNiuDeal4::~MsgGrabNiuDeal4() {}
-
-	MsgGrabNiuGrab::MsgGrabNiuGrab() {
-		msgType = MSG_GRAB_NIU_GRAB;
-		multiple = 0;
-	}
-
-	MsgGrabNiuGrab::~MsgGrabNiuGrab() {}
-
-	MsgGrabNiuBet::MsgGrabNiuBet() {
-		msgType = MSG_GRAB_NIU_BET;
-		multiple = 1;
-	}
-
-	MsgGrabNiuBet::~MsgGrabNiuBet() {}
-
-	MsgGrabNiuDeal1::MsgGrabNiuDeal1() {
-		msgType = MSG_GRAB_NIU_DEAL1;
-		genreType = 0;
-	}
-
-	MsgGrabNiuDeal1::~MsgGrabNiuDeal1() {}
-
-	MsgGrabNiuCompare::MsgGrabNiuCompare() {
-		msgType = MSG_GRAB_NIU_COMPARE;
-	}
-
-	MsgGrabNiuCompare::~MsgGrabNiuCompare() {}
-
 }

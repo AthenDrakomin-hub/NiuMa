@@ -37,6 +37,9 @@
 #include "GuanDan/GuanDanLoader.h"
 #include "GuanDan/GuanDanMessages.h"
 #include "GuanDan/GuanDanCandidateOrder.h"
+#include "GrabNiuNiu/GrabNiuNiuRoomHandler.h"
+#include "GrabNiuNiu/GrabNiuNiuLoader.h"
+#include "GrabNiuNiu/GrabNiuNiuMessages.h"
 #include "Game/DebtLiquidation.h"
 
 #include "Example.h"
@@ -327,6 +330,8 @@ int main(int argc, char* argv[]) {
         NiuMa::VenueManager::getSingleton().registLoader(loader);
         loader = std::make_shared<NiuMa::GuanDanLoader>();
         NiuMa::VenueManager::getSingleton().registLoader(loader);
+        loader = std::make_shared<NiuMa::GrabNiuNiuLoader>();
+        NiuMa::VenueManager::getSingleton().registLoader(loader);
 
         // 创建场地外消息处理器线程池
         NiuMa::IniConfig::getSingleton().getInt("Server", "outter_threads", threadNum);
@@ -379,6 +384,13 @@ int main(int argc, char* argv[]) {
             handlers.push_back(handler);
             NiuMa::VenueManager::getSingleton().registHandler(handler);
         }
+        // 创建抢庄牛牛游戏房间内部网络消息处理器
+        for (int i = 0; i < threadNum; i++) {
+            handler = std::make_shared<NiuMa::GrabNiuNiuRoomHandler>();
+            handler->registSelf();
+            handlers.push_back(handler);
+            NiuMa::VenueManager::getSingleton().registHandler(handler);
+        }
         // 创建场地内消息处理器线程池
         std::shared_ptr<NiuMa::MessageThreadPool> innerPool = std::make_shared<NiuMa::MessageThreadPool>();
         innerPool->start(threadNum, handlers);
@@ -393,6 +405,7 @@ int main(int argc, char* argv[]) {
         NiuMa::LackeyMessages::registMessages();
         NiuMa::NiuNiu100Messages::registMessages();
         NiuMa::GuanDanMessages::registMessages();
+        NiuMa::GrabNiuNiuMessages::registMessages();
 
         // 初始化掼蛋游戏出牌组合候选顺序表
         NiuMa::GuanDanCandidateOrder::getSingleton();

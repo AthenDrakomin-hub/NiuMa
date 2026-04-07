@@ -1,67 +1,56 @@
-#ifndef _GRAB_NIUNIU_ROOM_H_
-#define _GRAB_NIUNIU_ROOM_H_
+// GrabNiuNiuRoom.h
 
-#include "Venue.h"
-#include "GrabNiuNiuMessages.h"
-#include "GrabNiuNiuAvatar.h"
-#include "NiuNiuRule.h"
-#include "Dealer.h"
+#ifndef _NIU_MA_GRAB_NIU_NIU_ROOM_H_
+#define _NIU_MA_GRAB_NIU_NIU_ROOM_H_
 
-namespace NiuMa {
+#include "Game/GameRoom.h"
 
-	class GrabNiuNiuRoom : public Venue {
+namespace NiuMa
+{
+	class GrabNiuNiuRoom : public GameRoom
+	{
 	public:
-		GrabNiuNiuRoom(const std::string& id, int mode, long long dizhu, int config, long long limit, int capacity);
+		GrabNiuNiuRoom(const std::string& venueId, const std::string& number, int mode, int diZhu);
 		virtual ~GrabNiuNiuRoom();
 
-		virtual void onInit() override;
-		virtual void onTick(long long elapsed) override;
-		virtual void onMessage(Avatar* avatar, const std::string& msgType, const char* msg, int len) override;
-		virtual void onAvatarLeave(Avatar* avatar) override;
+	public:
+		// 游戏状态
+		enum class GameState : int
+		{
+			WaitStart,		// 等待开始
+			Deal4,			// 发4张牌
+			GrabBanker,		// 抢庄
+			Betting,		// 下注
+			Deal1,			// 发最后1张牌
+			Compare,		// 比牌
+			Settlement		// 结算
+		};
+
+	public:
+		virtual void initialize() override;
+		virtual void onTimer() override;
+		virtual bool onMessage(const NetMessage::Ptr& netMsg) override;
+		virtual void onConnect(const std::string& playerId) override;
 
 	protected:
-		virtual Avatar* createAvatar(const std::string& accountId, const std::string& password, int seat) override;
-		
-		// 客户端请求
-		void onMsgGrabNiuSync(Avatar* avatar, const char* msg, int len);
-		void onMsgGrabNiuGrab(Avatar* avatar, const char* msg, int len);
-		void onMsgGrabNiuBet(Avatar* avatar, const char* msg, int len);
-		void onMsgPlayerReady(Avatar* avatar, const char* msg, int len);
-
-		// 状态机流转控制
-		void checkStartGame();
-		void changeState(GrabNiuNiuState state, long long timeoutMs);
-		void onStateTimeout();
-
-		// 游戏核心流程
-		void beginDeal4();
-		void beginGrabBanker();
-		void endGrabBanker();
-		void beginBetting();
-		void endBetting();
-		void beginDeal1();
-		void beginCompare();
-		void beginSettlement();
-
-		// 辅助方法
-		int getGenreMultiple(int genre) const;
-		GrabNiuNiuAvatar* getBankerAvatar() const;
-		void broadcastState();
+		virtual GameAvatar::Ptr createAvatar(const std::string& playerId, int seat, bool robot) const override;
+		virtual bool checkEnter(const std::string& playerId, std::string& errMsg, bool robot = false) const override;
+		virtual int checkLeave(const std::string& playerId, std::string& errMsg) const override;
+		virtual void getAvatarExtraInfo(const GameAvatar::Ptr& avatar, std::string& base64) const override;
+		virtual void onAvatarJoined(int seat, const std::string& playerId) override;
+		virtual void onAvatarLeaved(int seat, const std::string& playerId) override;
 
 	private:
-		GrabNiuNiuState _gameState;
-		long long _stateTimer;			// 状态倒计时(毫秒)
-		
-		NiuNiuRule _rule;
-		Dealer _dealer;
-		std::string _bankerId;			// 当前庄家ID
-		int _bankerMultiple;			// 庄家抢庄倍数
+		void setState(GameState s);
+		int getStateElapsed() const;
 
-		int _readyCount;				// 准备人数
-		int _grabbedCount;				// 已抢庄人数
-		int _bettedCount;				// 已下注人数
+	private:
+		const std::string _number;
+		int _mode;
+		int _diZhu;
+		GameState _gameState;
+		time_t _stateTime;
 	};
-
 }
 
-#endif
+#endif // !_NIU_MA_GRAB_NIU_NIU_ROOM_H_

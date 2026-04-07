@@ -26,6 +26,7 @@ namespace NiuMa
 		Niu9,					// 牛九
 		NiuNiu = 0x0010,		// 牛牛
 		ShunZi = 0x0020,		// 顺子牛
+		YinNiu = 0x0030,        // 银牛
 		WuHua = 0x0040,			// 五花牛
 		TongHua = 0x0060,		// 同花牛
 		HuLu = 0x0080,			// 葫芦牛
@@ -45,7 +46,7 @@ namespace NiuMa
 
 	protected:
 		const bool _niu100;			// 是否为百人牛牛
-		static const int GENRE_ORDER_NIU100[13];		// 百人牛牛牌型大小顺序表(从小到大)
+		static const int GENRE_ORDER_NIU100[15];		// 百人牛牛牌型大小顺序表(从小到大)
 		
 	public:
 		// 判定牌型

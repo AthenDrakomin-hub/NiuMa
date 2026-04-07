@@ -29,7 +29,7 @@ namespace NiuMa
 		{}
 	};
 
-	const int NiuNiuRule::GENRE_ORDER_NIU100[13] =
+	const int NiuNiuRule::GENRE_ORDER_NIU100[15] =
 	{
 		static_cast<int>(NiuNiuGenre::Niu0),
 		static_cast<int>(NiuNiuGenre::Niu1),
@@ -42,8 +42,10 @@ namespace NiuMa
 		static_cast<int>(NiuNiuGenre::Niu8),
 		static_cast<int>(NiuNiuGenre::Niu9),
 		static_cast<int>(NiuNiuGenre::NiuNiu),
+		static_cast<int>(NiuNiuGenre::YinNiu),
+		static_cast<int>(NiuNiuGenre::WuHua),
 		static_cast<int>(NiuNiuGenre::ZhaDan),
-		static_cast<int>(NiuNiuGenre::WuHua)
+		static_cast<int>(NiuNiuGenre::WuXiao)
 	};
 
 	NiuNiuRule::NiuNiuRule(bool niu100)
@@ -238,9 +240,13 @@ namespace NiuMa
 	int NiuNiuRule::predicateCardGenre2(PokerGenre& pcg) const {
 		if (pcg.carryM_N(4, 1))	// 炸弹牛
 			return static_cast<int>(NiuNiuGenre::ZhaDan);
+		
 		int arrPoints[5] = { 0 };
 		int nSum = 0;
-		bool test = true;
+		bool wuHua = true;
+		bool yinNiu = true;
+		bool wuXiao = true;
+		int wuXiaoSum = 0;
 		CardArray& cards = pcg.getCards();
 		int pt = static_cast<int>(PokerPoint::Invalid);
 		for (unsigned int i = 0; i < 5; i++) {
@@ -248,16 +254,36 @@ namespace NiuMa
 			pt = c.getPoint();
 			if (pt < static_cast<int>(PokerPoint::Jack)) {
 				arrPoints[i] = pt;
-				test = false;
+				wuHua = false;
+				if (pt < static_cast<int>(PokerPoint::Ten)) {
+					yinNiu = false;
+				}
+				if (pt >= static_cast<int>(PokerPoint::Five)) {
+					wuXiao = false;
+				}
+				wuXiaoSum += pt;
 			}
-			else if (pt < static_cast<int>(PokerPoint::Joker))
+			else if (pt < static_cast<int>(PokerPoint::Joker)) {
 				arrPoints[i] = 10;
-			else
-				test = false;
+				wuXiao = false;
+			}
+			else {
+				wuHua = false;
+				yinNiu = false;
+				wuXiao = false;
+			}
 		}
 		pcg.setOfficer(cards[4]);
-		if (test)			// 五花牛
+		
+		if (wuXiao && wuXiaoSum <= 10)
+			return static_cast<int>(NiuNiuGenre::WuXiao); // 五小牛
+		
+		if (wuHua)			// 五花牛
 			return static_cast<int>(NiuNiuGenre::WuHua);
+			
+		if (yinNiu)         // 银牛
+			return static_cast<int>(NiuNiuGenre::YinNiu);
+			
 		unsigned int ids[5] = { 0, 0, 0, 0, 0 };
 		unsigned int tmp = 0;
 		int nRemainder = 0;
@@ -354,7 +380,7 @@ namespace NiuMa
 	}
 
 	int NiuNiuRule::getGenreOrderNiu100(int genre) {
-		for (int i = 0; i < 13; i++) {
+		for (int i = 0; i < 15; i++) {
 			if (GENRE_ORDER_NIU100[i] == genre)
 				return i;
 		}

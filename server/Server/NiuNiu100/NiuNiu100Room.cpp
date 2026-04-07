@@ -350,9 +350,14 @@ namespace NiuMa
 			mul = 2;
 		else if (genre == static_cast<int>(NiuNiuGenre::NiuNiu))
 			mul = 3;
-		else if (genre == static_cast<int>(NiuNiuGenre::ZhaDan) ||
-			genre == static_cast<int>(NiuNiuGenre::WuHua))
+		else if (genre == static_cast<int>(NiuNiuGenre::YinNiu))
 			mul = 4;
+		else if (genre == static_cast<int>(NiuNiuGenre::WuHua))
+			mul = 5;
+		else if (genre == static_cast<int>(NiuNiuGenre::ZhaDan))
+			mul = 6;
+		else if (genre == static_cast<int>(NiuNiuGenre::WuXiao))
+			mul = 8;
 		return mul;
 	}
 

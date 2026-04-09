@@ -102,6 +102,7 @@ namespace NiuMa
 		void saveGameRecord(const std::string& playerId, int64_t score, int genre);
 		
 		// 机器人逻辑
+		void updateRobots();
 		void addRobot();
 		void removeRobot();
 		void robotGrab();
@@ -112,8 +113,6 @@ namespace NiuMa
 		bool validatePlayer(const std::string& playerId, std::string& errMsg) const;
 		bool checkGameStart() const;
 		void handleGameError(const std::string& error);
-		// 统计方法
-		int getReadyCount() const;
 
 	private:
 		const std::string _number;

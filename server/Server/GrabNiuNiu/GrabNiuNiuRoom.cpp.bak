@@ -79,9 +79,7 @@ namespace NiuMa
 		GameRoom::onTimer();
 
 		// 更新机器人
-		// 更新机器人
-		addRobot();
-		removeRobot();
+		updateRobots();
 
 		int elapsed = getStateElapsed();
 		
@@ -194,9 +192,18 @@ namespace NiuMa
 		if (robot)
 			return true;
 		
-		// TODO: 金币检查需要从数据库查询
-		// 目前暂时跳过金币检查，允许所有玩家进入
-		(void)_config.minGold;  // 避免未使用警告
+		// 检查玩家金币是否足够
+		Player::Ptr player = PlayerManager::getSingleton().getPlayer(playerId);
+		if (!player) {
+			errMsg = "玩家不存在";
+			return false;
+		}
+		
+		int64_t gold = player->getGold();
+		if (gold < _config.minGold) {
+			errMsg = "金币不足，需要至少 " + std::to_string(_config.minGold) + " 金币";
+			return false;
+		}
 		
 		return true;
 	}
@@ -445,17 +452,17 @@ namespace NiuMa
 	}
 
 	void GrabNiuNiuRoom::onGrabBanker(const NetMessage::Ptr& netMsg) {
+		// 只在抢庄阶段处理
+		if (_gameState != GameState::GrabBanker) {
+			sendError(netMsg->getSession()->getPlayerId(), 1, "当前不是抢庄阶段");
+			return;
+		}
+		
 		MsgGrabNiuGrab* msg = dynamic_cast<MsgGrabNiuGrab*>(netMsg->getMessage().get());
 		if (!msg)
 			return;
 		
 		const std::string& playerId = msg->getPlayerId();
-		
-		// 只在抢庄阶段处理
-		if (_gameState != GameState::GrabBanker) {
-			sendError(playerId, 1, "当前不是抢庄阶段");
-			return;
-		}
 		
 		// 检查玩家是否在房间中
 		GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(getAvatar(playerId).get());
@@ -474,17 +481,17 @@ namespace NiuMa
 	}
 
 	void GrabNiuNiuRoom::onBet(const NetMessage::Ptr& netMsg) {
+		// 只在下注阶段处理
+		if (_gameState != GameState::Betting) {
+			sendError(netMsg->getSession()->getPlayerId(), 3, "当前不是下注阶段");
+			return;
+		}
+		
 		MsgGrabNiuBet* msg = dynamic_cast<MsgGrabNiuBet*>(netMsg->getMessage().get());
 		if (!msg)
 			return;
 		
 		const std::string& playerId = msg->getPlayerId();
-		
-		// 只在下注阶段处理
-		if (_gameState != GameState::Betting) {
-			sendError(playerId, 3, "当前不是下注阶段");
-			return;
-		}
 		
 		// 庄家不能下注
 		if (playerId == _bankerId) {
@@ -515,11 +522,7 @@ namespace NiuMa
 			return;
 		}
 		
-		MsgPlayerSignature* msg = dynamic_cast<MsgPlayerSignature*>(netMsg->getMessage().get());
-		if (!msg)
-			return;
-		
-		const std::string& playerId = msg->getPlayerId();
+		const std::string& playerId = netMsg->getSession()->getPlayerId();
 		GameAvatar::Ptr avatar = getAvatar(playerId);
 		if (avatar) {
 			avatar->setReady(true);
@@ -742,6 +745,16 @@ namespace NiuMa
 
 	// ==================== 机器人逻辑 ====================
 
+	void GrabNiuNiuRoom::updateRobots() {
+		time_t nowTick = BaseUtils::getCurrentMillisecond();
+		
+		// 添加机器人
+		addRobot();
+		
+		// 移除长时间在线的机器人
+		removeRobot();
+	}
+
 	void GrabNiuNiuRoom::addRobot() {
 		// 只在等待阶段或人数不足时添加机器人
 		if (_gameState != GameState::WaitStart && getAvatarCount() >= _config.minPlayers)
@@ -779,7 +792,7 @@ namespace NiuMa
 			return;
 		
 		// 机器人进入房间
-		if (!joinRobot(playerId)) {
+		if (!enter(playerId, "", true)) {
 			RobotManager::getSingleton().free(playerId);
 			return;
 		}
@@ -815,7 +828,7 @@ namespace NiuMa
 			
 			// 在线超过5分钟，有概率离开
 			if (nowTick - joinTick > 300000 && BaseUtils::randInt(0, 100) < 20) {
-				kickAvatar(avatar);
+				leave(robotId);
 				_robots.erase(_robots.begin() + idx);
 				RobotManager::getSingleton().free(robotId);
 				InfoS << "机器人(" << robotId << ")离开房间(" << getId() << ")";

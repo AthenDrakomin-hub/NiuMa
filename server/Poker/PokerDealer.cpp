@@ -278,15 +278,3 @@ namespace NiuMa
 		return true;
 	}
 }
-        bool PokerDealer::handOutSpecificCard(PokerCard& c, int cardId) {
-                for (auto it = _indicesLeft.begin(); it != _indicesLeft.end(); ++it) {
-                        PokerCard card;
-                        _cardPool->getCard(card, *it);
-                        if (card.getId() == cardId) {
-                                c = card;
-                                _indicesLeft.erase(it);
-                                return true;
-                        }
-                }
-                return false; // Card not found or already dealt
-        }

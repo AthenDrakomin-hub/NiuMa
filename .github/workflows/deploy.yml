@@ -22,7 +22,7 @@ jobs:
           ARGS: "-avz --delete"
           # Depending on your repo structure, this SOURCE points to the built H5 files
           # Make sure to update this if your build output is elsewhere
-          SOURCE: "client-cocos/build/web-mobile/"
+          SOURCE: "build/web-mobile/"
           REMOTE_HOST: ${{ secrets.SERVER_HOST }}
           REMOTE_USER: ${{ secrets.SERVER_USER }}
           TARGET: "/usr/share/nginx/html/h5/"

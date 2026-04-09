@@ -1,0 +1,38 @@
+name: Deploy H5 Game to Server
+
+on:
+  push:
+    branches:
+      - web
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Server via rsync
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-avz --delete"
+          # Depending on your repo structure, this SOURCE points to the built H5 files
+          # Make sure to update this if your build output is elsewhere
+          SOURCE: "client-cocos/build/web-mobile/"
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: "/usr/share/nginx/html/h5/"
+
+      - name: Fix Nginx Permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            chmod -R 755 /usr/share/nginx/html/h5
+            chown -R www-data:www-data /usr/share/nginx/html/h5

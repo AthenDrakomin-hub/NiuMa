@@ -12,16 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1. 部署 H5 游戏客户端
-      - name: Deploy H5 Game via rsync
-        uses: easingthemes/ssh-deploy@main
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
-          ARGS: "-avz --delete"
-          SOURCE: "build/web-mobile/"
-          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
-          REMOTE_USER: ${{ secrets.SERVER_USER }}
-          TARGET: "/usr/share/nginx/html/h5/"
 
       # 2. 编译并部署 Vue 管理后台
       - name: Setup Node.js

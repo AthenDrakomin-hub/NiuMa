@@ -29,8 +29,8 @@ jobs:
       - name: Build Boost
         if: steps.cache-boost.outputs.cache-hit != 'true'
         run: |
-          wget https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz
-          tar -xzf boost_1_75_0.tar.gz
+          wget https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.bz2
+          tar -xjf boost_1_75_0.tar.bz2
           cd boost_1_75_0
           ./bootstrap.sh --prefix=/usr/local/boost_1_75_0
           sudo ./b2 install --toolset=gcc --without-python link=static runtime-link=shared threading=multi variant=release address-model=64 -j4

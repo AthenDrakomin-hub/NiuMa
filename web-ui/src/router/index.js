@@ -87,6 +87,26 @@ export const constantRoutes = [
         meta: { title: '个人中心', icon: 'user' }
       }
     ]
+  },
+  {
+    path: '/game-client',
+    component: Layout,
+    hidden: true,
+    redirect: '/game-client/lobby',
+    children: [
+      {
+        path: 'lobby',
+        component: () => import('@/views/gameClient/lobby/index'),
+        name: 'GameLobby',
+        meta: { title: '游戏大厅' }
+      },
+      {
+        path: 'grab-niuniu',
+        component: () => import('@/views/gameClient/grabNiuNiu/index'),
+        name: 'GrabNiuNiu',
+        meta: { title: '抢庄牛牛' }
+      }
+    ]
   }
 ]
 

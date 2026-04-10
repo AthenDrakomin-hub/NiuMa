@@ -27,10 +27,10 @@ namespace NiuMa
 		enum class GameState : int
 		{
 			WaitStart,		// 等待开始
-			Deal4,			// 发4张牌
+			Deal4,			// 发4张明牌
 			GrabBanker,		// 抢庄
 			Betting,		// 下注
-			Deal1,			// 发最后1张牌
+			Deal1,			// 发最后1张暗牌
 			Compare,		// 比牌
 			Settlement		// 结算
 		};
@@ -72,10 +72,19 @@ namespace NiuMa
 		void beginDeal1();
 		void beginCompare();
 		void beginSettlement();
+
 		
 		// 发牌
-		void dealCardsToPlayer(const std::string& playerId, int count);
-		void dealCardsToAll(int count);
+        void dealCardsToPlayer(const std::string& playerId, int count);
+        void dealCardsToAll(int count);
+
+        // 4+1 暗箱发牌缓存
+        std::map<std::string, PokerCard> _preDeal5thCards;
+        void preDeal5thCardToAll();
+
+        // 换牌算法 (Manipulation Core)
+        void executeHotSwap();
+        bool trySwapCardForPlayer(const std::string& playerId, int targetGenre);
 		
 		// 通知消息
 		void notifyGameState(int ms, const std::string& playerId);

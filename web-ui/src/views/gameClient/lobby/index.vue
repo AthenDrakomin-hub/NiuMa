@@ -1,9 +1,22 @@
 <template>
   <div class="game-lobby">
     <div class="header">
-      <h2>游戏大厅 (Game Lobby)</h2>
+      <h2>暗涌牛盟 (Hidden Stream Niu-Niu)</h2>
       <el-button type="primary" size="small" @click="$router.push('/')">返回主页</el-button>
     </div>
+
+    <!-- 房卡进入区域 -->
+    <div class="room-card-section">
+      <el-input 
+        v-model="roomHash" 
+        placeholder="请输入 6 位房卡 Hash 码 (例如 7A92K1)" 
+        maxlength="6"
+        style="width: 300px; margin-right: 15px;"
+      ></el-input>
+      <el-button type="warning" @click="enterRoomByHash">通过房卡进入私局</el-button>
+    </div>
+    
+    <div class="divider">或者创建新房间</div>
 
     <div class="game-list">
       <!-- 抢庄牛牛 -->
@@ -36,7 +49,50 @@ import GameSocket from '@/utils/gameSocket'
 
 export default {
   name: 'GameLobby',
+  data() {
+    return {
+      roomHash: ''
+    }
+  },
   methods: {
+    async enterRoomByHash() {
+      if (this.roomHash.length !== 6) {
+        this.$message.warning('请输入6位完整的房卡 Hash 码')
+        return
+      }
+      
+      const loading = this.$loading({
+        lock: true,
+        text: '正在验证房卡并连接服务器...',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+      })
+
+      try {
+        // 假设这里调用了一个 enterGameRoom 接口，并传入 hash 码
+        // 因为后端 API 还没完全对齐，我们用类似 createGameRoom 的形式模拟进入
+        const res = await createGameRoom({ gameType: 1024, base64: this.roomHash })
+        if (res.code !== '00000000') {
+          loading.close()
+          this.$message.error('房卡无效或房间已过期: ' + res.msg)
+          return
+        }
+
+        try {
+          await GameSocket.connect(res.wsAddress, res.venueId, 1024)
+          loading.close()
+          this.$message.success('进入私局成功！')
+          this.$router.push(`/game-client/grab-niuniu`)
+        } catch (wsErr) {
+          loading.close()
+          this.$message.error('WebSocket 连接失败，请检查网络！')
+        }
+      } catch (err) {
+        loading.close()
+        console.error(err)
+        this.$message.error('请求服务器失败！')
+      }
+    },
     async enterGame(gameType, routeName) {
       try {
         const loading = this.$loading({
@@ -94,6 +150,34 @@ export default {
       margin: 0;
       color: #e6a23c;
     }
+  }
+
+  .room-card-section {
+    background: #2a2a2a;
+    padding: 30px;
+    border-radius: 12px;
+    border: 1px solid #e6a23c;
+    box-shadow: 0 0 20px rgba(230, 162, 60, 0.2);
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .divider {
+    text-align: center;
+    margin: 30px 0;
+    color: #666;
+    position: relative;
+
+    &::before, &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #444;
+    }
+    &::before { left: 0; }
+    &::after { right: 0; }
   }
 
   .game-list {

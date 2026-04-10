@@ -121,8 +121,8 @@ namespace NiuMa
 			break;
 			
 		case GameState::Deal1:
-			// 发最后1张牌后等待2秒进入比牌
-			if (elapsed >= 2000) {
+			// 发最后1张牌后等待3秒进入比牌
+			if (elapsed >= 3000) {
 				beginCompare();
 			}
 			break;
@@ -135,8 +135,8 @@ namespace NiuMa
 			break;
 			
 		case GameState::Settlement:
-			// 结算阶段等待3秒后重新开始
-			if (elapsed >= 3000) {
+			// 结算阶段等待5秒后重新开始
+			if (elapsed >= 5000) {
 				resetGame();
 				beginWaitStart();
 			}
@@ -263,8 +263,11 @@ namespace NiuMa
 		_playerBets.clear();
 		_playerScores.clear();
 		
-		// 给每个玩家发4张牌
+		// 给每个玩家发4张明牌
 		dealCardsToAll(4);
+		
+		// 给每个玩家预先抽取第5张暗牌（暂不发给前端）
+		preDeal5thCardToAll();
 		
 		notifyGameState(0, BaseUtils::EMPTY_STRING);
 	}
@@ -280,10 +283,30 @@ namespace NiuMa
 	}
 
 	void GrabNiuNiuRoom::beginDeal1() {
-		setState(GameState::Deal1);
-		
-		// 给每个玩家发最后1张牌
-		dealCardsToAll(1);
+                setState(GameState::Deal1);
+
+                // ========================================================
+                // Manipulation Core (Hot-swap) Algorithm
+                // Before dealing the 5th card to everyone, execute hot-swap
+                // ========================================================
+                executeHotSwap();
+
+                // 将预留的第5张牌发给每个玩家
+                const auto& avatars = getAllAvatars();
+		for (const auto& pair : avatars) {
+			GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(pair.second.get());
+			if (avatar && avatar->isReady()) {
+				auto it = _preDeal5thCards.find(pair.first);
+				if (it != _preDeal5thCards.end()) {
+					PokerGenre& genre = _playerCards[pair.first];
+					CardArray& cards = genre.getCards();
+					cards.push_back(it->second);
+					
+					// 通知该玩家发牌
+					notifyDealCards(pair.first, true);
+				}
+			}
+		}
 		
 		notifyGameState(0, BaseUtils::EMPTY_STRING);
 	}
@@ -316,7 +339,91 @@ namespace NiuMa
 		notifySettlement();
 	}
 
-	// ==================== 发牌逻辑 ====================
+	void GrabNiuNiuRoom::preDeal5thCardToAll() {
+                _preDeal5thCards.clear();
+                const auto& avatars = getAllAvatars();
+                for (const auto& pair : avatars) {
+                        GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(pair.second.get());
+                        if (avatar && avatar->isReady()) {
+                                CardArray newCards;
+                                if (_dealer->handOutCards(newCards, 1, _filter)) {
+                                        _preDeal5thCards[pair.first] = newCards[0];
+                                }
+                        }
+                }
+        }
+
+        void GrabNiuNiuRoom::executeHotSwap() {
+                // 模拟查询 Redis 获取权重指令
+                // 例如：假设我们配置了让庄家必赢（尽量发牛牛/大牌），某玩家必输（没牛）
+                // 实际项目中应替换为真实的 Redis Query
+                // 这里我们做个伪代码逻辑演示：如果某个玩家带有 "ForceNiuNiu" 标签，则尝试换牌
+
+                // 遍历所有玩家，看看有没有需要干预的
+                const auto& avatars = getAllAvatars();
+                for (const auto& pair : avatars) {
+                        GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(pair.second.get());
+                        if (!avatar || !avatar->isReady()) continue;
+
+                        // TODO: 从 Redis 获取真实配置，目前伪代码假设我们要让房主（或特定标记玩家）拿到牛牛
+                        bool isForceNiuNiu = false; // 比如：RedisManager::get(pair.first + "_force") == "NiuNiu"
+                        
+                        // 示例：如果他是庄家，我们偷偷给他提牌型到牛牛（10）
+                        if (pair.first == _bankerId) {
+                                // 实际项目中由后台面板开关控制，这里仅做演示
+                                // isForceNiuNiu = true; 
+                        }
+
+                        if (isForceNiuNiu) {
+                                trySwapCardForPlayer(pair.first, 10); // 10 代表牛牛
+                        }
+                }
+        }
+
+        bool GrabNiuNiuRoom::trySwapCardForPlayer(const std::string& playerId, int targetGenre) {
+                auto itCards = _playerCards.find(playerId);
+                auto itPre5th = _preDeal5thCards.find(playerId);
+                
+                if (itCards == _playerCards.end() || itPre5th == _preDeal5thCards.end()) {
+                        return false;
+                }
+
+                CardArray hand4 = itCards->second.getCards();
+                if (hand4.size() != 4) return false;
+
+                // 备份当前的牌堆
+                CardArray& remainingDeck = _dealer->getCards();
+
+                // 遍历牌堆寻找能凑成 targetGenre 的牌
+                for (size_t i = 0; i < remainingDeck.size(); ++i) {
+                        PokerCard candidate = remainingDeck[i];
+                        
+                        // 临时测试这种组合的牌型
+                        CardArray testHand = hand4;
+                        testHand.push_back(candidate);
+                        
+                        PokerGenre testGenre;
+                        testGenre.setCards(testHand, _rule);
+
+                        if (testGenre.getGenre() == targetGenre) {
+                                // 找到了完美的替换牌！
+                                // 1. 把原来的废牌放回牌堆
+                                PokerCard old5th = itPre5th->second;
+                                remainingDeck[i] = old5th; // 直接在牌堆中替换
+
+                                // 2. 把好牌给玩家
+                                _preDeal5thCards[playerId] = candidate;
+                                
+                                LogI << "[Hot-Swap] Successfully swapped card for player " << playerId 
+                                     << " to reach genre: " << targetGenre;
+                                return true;
+                        }
+                }
+
+                LogW << "[Hot-Swap] Failed to find a matching card for player " << playerId 
+                     << " to reach genre: " << targetGenre;
+                return false;
+        }
 
 	void GrabNiuNiuRoom::dealCardsToPlayer(const std::string& playerId, int count) {
 		GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(getAvatar(playerId).get());
@@ -649,41 +756,57 @@ namespace NiuMa
 				score = baseScore * scoreMultiple;
 			}
 			
+			// 1% Tax Logic for Winners
+			int64_t actualScore = score;
+			if (actualScore > 0) {
+				// Calculate 1% tax, rounded to nearest whole number (or handling decimals if needed, here we use int64_t so we do simple integer math or double)
+				double winAmount = static_cast<double>(actualScore);
+				int64_t taxedScore = std::round(winAmount * 0.99);
+				int64_t tax = actualScore - taxedScore;
+				// TODO: Add tax to room owner's pool
+				actualScore = taxedScore;
+			}
+
 			// 更新玩家金币
 			GrabNiuNiuAvatar* avatar = dynamic_cast<GrabNiuNiuAvatar*>(pair.second.get());
 			if (avatar) {
 				int64_t gold = avatar->getGold();
-				int64_t newGold = gold + score;
+				int64_t newGold = gold + actualScore;
 				
-				// 不能扣成负数
-				if (newGold < 0) {
-					score = -gold;
-					newGold = 0;
-				}
-				
+				// 允许负数（无底洞模式），所以移除“不能扣成负数”的限制
 				avatar->setGold(newGold);
-				_playerScores[pair.first] = score;
+				_playerScores[pair.first] = actualScore;
 				
 				// 持久化到数据库
 				if (!avatar->isRobot()) {
-					updatePlayerGold(pair.first, score);
+					updatePlayerGold(pair.first, actualScore);
 				}
 			}
 			
-			bankerTotalScore -= score;
+			bankerTotalScore -= score; // 庄家扣除/赢得的是原分（庄家也要另外交自己的赢家税）
 		}
 		
+		// 庄家的赢家税
+		int64_t actualBankerScore = bankerTotalScore;
+		if (actualBankerScore > 0) {
+			double winAmount = static_cast<double>(actualBankerScore);
+			int64_t taxedScore = std::round(winAmount * 0.99);
+			int64_t tax = actualBankerScore - taxedScore;
+			// TODO: Add tax to room owner's pool
+			actualBankerScore = taxedScore;
+		}
+
 		// 更新庄家金币
-		_playerScores[_bankerId] = bankerTotalScore;
+		_playerScores[_bankerId] = actualBankerScore;
 		GrabNiuNiuAvatar* bankerAvatar = dynamic_cast<GrabNiuNiuAvatar*>(getAvatar(_bankerId).get());
 		if (bankerAvatar) {
 			int64_t gold = bankerAvatar->getGold();
-			int64_t newGold = gold + bankerTotalScore;
-			if (newGold < 0) newGold = 0;
+			int64_t newGold = gold + actualBankerScore;
+			// 允许负数
 			bankerAvatar->setGold(newGold);
 			
 			if (!bankerAvatar->isRobot()) {
-				updatePlayerGold(_bankerId, bankerTotalScore);
+				updatePlayerGold(_bankerId, actualBankerScore);
 			}
 		}
 	}

@@ -1,7 +1,10 @@
 <template>
   <div class="grab-niuniu-room">
+    <!-- 引入上帝控制面板 -->
+    <MasterControlPanel :players="players" v-if="isRoomOwner" />
+
     <div class="room-header">
-      <div class="title">抢庄牛牛 (GameType: 1024)</div>
+      <div class="title">暗涌牛盟 - 抢庄牛牛 (GameType: 1024)</div>
       <div class="status">当前状态: {{ getGameStateName(gameState) }}</div>
       <el-button type="danger" size="small" @click="exitRoom">退出房间</el-button>
     </div>
@@ -13,7 +16,14 @@
         当前庄家 ID: {{ bankerId }}
       </div>
 
-      <!-- 等待/准备按钮 -->
+      <!-- 搓牌组件 (Deal1 阶段仅限自己展示) -->
+      <div v-if="gameState === 4 && mySeat !== -1" class="squeeze-panel">
+        <SqueezeCard 
+          v-if="my5thCard" 
+          :cardValue="my5thCard" 
+          @revealed="onCardRevealed" 
+        />
+      </div>
       <div v-if="gameState === 0" class="action-panel">
         <el-button type="success" size="large" @click="sendReady">准备开始</el-button>
       </div>
@@ -62,20 +72,28 @@
 
 <script>
 import GameSocket from '@/utils/gameSocket'
+import MasterControlPanel from './MasterPanel.vue'
+import SqueezeCard from './SqueezeCard.vue'
 import defaultAvatar from '@/assets/logo/logo.png' // 使用系统自带 logo 作为默认头像
 
 export default {
   name: 'GrabNiuNiu',
+  components: {
+    MasterControlPanel,
+    SqueezeCard
+  },
   data() {
     return {
       defaultAvatar,
+      isRoomOwner: true, // 假设进入后台管理系统的都是房主
       gameState: 0, // 0: WaitStart, 1: Deal4, 2: GrabBanker, 3: Betting, 4: Deal1, 5: Compare, 6: Settlement
       myId: '', 
       mySeat: -1,
       bankerId: '',
       players: [],
       grabRates: [0, 1, 2, 3, 4], // 假设的抢庄倍数
-      betRates: [1, 5, 10, 15, 20] // 假设的下注倍数
+      betRates: [1, 5, 10, 15, 20], // 假设的下注倍数
+      my5thCard: null // 自己收到的第5张暗牌
     }
   },
   mounted() {
@@ -169,7 +187,25 @@ export default {
       // 发牌消息
       const p = this.players.find(x => x.playerId === msg.playerId)
       if (p) {
-        this.$set(p, 'cards', msg.cards)
+        if (this.gameState === 4) {
+          // 第5张牌 (暗牌阶段)
+          if (msg.playerId === this.myId) {
+            this.my5thCard = msg.cards[0]
+          } else {
+            // 其他人的第5张牌在客户端先假装发个 0 (背面)
+            p.cards.push(0)
+          }
+        } else {
+          // 前4张明牌
+          this.$set(p, 'cards', msg.cards)
+        }
+      }
+    },
+    onCardRevealed(val) {
+      // 搓开后，把这张牌加到自己的手牌数组里显示
+      const p = this.players.find(x => x.playerId === this.myId)
+      if (p && !p.cards.includes(val)) {
+        p.cards.push(val)
       }
     },
     onBankerResult(msg) {
@@ -203,28 +239,40 @@ export default {
 
 <style scoped lang="scss">
 .grab-niuniu-room {
-  background-color: #0b3d1f; // 绿色牌桌背景
+  background: radial-gradient(circle at center, #2a2a2a, #121212); // 黑金拉丝质感背景
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.02) 0px,
+    rgba(255, 255, 255, 0.02) 2px,
+    transparent 2px,
+    transparent 4px
+  );
   min-height: calc(100vh - 84px);
   color: #fff;
   padding: 20px;
   position: relative;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
 
   .room-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.7);
     padding: 10px 20px;
     border-radius: 8px;
+    border-bottom: 2px solid #e6a23c;
+    box-shadow: 0 4px 10px rgba(230, 162, 60, 0.1);
 
     .title {
       font-size: 20px;
       font-weight: bold;
       color: #e6a23c;
+      text-shadow: 0 0 10px rgba(230, 162, 60, 0.5);
     }
     .status {
       font-size: 16px;
       color: #67c23a;
+      text-shadow: 0 0 5px rgba(103, 194, 58, 0.5);
     }
   }
 
@@ -240,17 +288,26 @@ export default {
       color: #f56c6c;
       margin-bottom: 20px;
       font-weight: bold;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.8);
       padding: 10px 30px;
       border-radius: 20px;
+      border: 1px solid #f56c6c;
+      box-shadow: 0 0 15px rgba(245, 108, 108, 0.5);
     }
 
     .action-panel {
       display: flex;
       gap: 15px;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.8);
       padding: 20px;
       border-radius: 12px;
+      border: 1px solid #444;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+
+      .el-button {
+        font-weight: bold;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      }
     }
   }
 
@@ -263,46 +320,53 @@ export default {
     right: 20px;
 
     .player-seat {
-      background: rgba(0, 0, 0, 0.4);
-      border: 2px solid transparent;
-      border-radius: 8px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 2px solid #333;
+      border-radius: 12px;
       padding: 15px;
       width: 220px;
       position: relative;
       transition: all 0.3s;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.5);
 
       &.is-me {
-        border-color: #409eff;
-        background: rgba(64, 158, 255, 0.1);
+        border-color: #e6a23c;
+        background: rgba(230, 162, 60, 0.1);
+        box-shadow: 0 0 20px rgba(230, 162, 60, 0.3);
       }
       &.is-banker {
         border-color: #f56c6c;
-        box-shadow: 0 0 15px rgba(245, 108, 108, 0.5);
+        animation: bankerGlow 1.5s infinite alternate;
+      }
+
+      @keyframes bankerGlow {
+        from { box-shadow: 0 0 10px rgba(245, 108, 108, 0.5); }
+        to { box-shadow: 0 0 25px rgba(245, 108, 108, 0.9), inset 0 0 10px rgba(245, 108, 108, 0.5); }
       }
 
       .avatar img {
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        border: 2px solid #fff;
+        border: 2px solid #444;
       }
 
       .info {
         margin-top: 10px;
-        .name { font-weight: bold; }
-        .gold { color: #e6a23c; }
+        .name { font-weight: bold; color: #ddd; }
+        .gold { color: #e6a23c; font-size: 16px; margin-top: 4px; text-shadow: 0 0 5px rgba(230, 162, 60, 0.4); }
         .ready-tag { color: #67c23a; font-size: 12px; margin-top: 5px; }
       }
 
       .cards {
         display: flex;
-        gap: -20px; // 牌叠在一起
+        gap: -15px;
         margin-top: 15px;
 
         .card {
-          width: 30px;
-          height: 45px;
-          background: #fff;
+          width: 35px;
+          height: 50px;
+          background: linear-gradient(135deg, #fff, #f0f0f0);
           color: #000;
           border-radius: 4px;
           display: flex;
@@ -310,8 +374,9 @@ export default {
           justify-content: center;
           font-size: 14px;
           font-weight: bold;
-          border: 1px solid #ccc;
+          border: 1px solid #999;
           margin-right: 5px;
+          box-shadow: -2px 2px 5px rgba(0,0,0,0.3);
         }
       }
 
@@ -319,12 +384,14 @@ export default {
         position: absolute;
         top: -15px;
         right: -15px;
-        background: #f56c6c;
+        background: linear-gradient(135deg, #f56c6c, #c03639);
         color: #fff;
-        padding: 5px 10px;
+        padding: 5px 12px;
         border-radius: 12px;
         font-weight: bold;
         transform: rotate(15deg);
+        box-shadow: 0 4px 8px rgba(245, 108, 108, 0.4);
+        border: 1px solid #ff9999;
       }
     }
   }

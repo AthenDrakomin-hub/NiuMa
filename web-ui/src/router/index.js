@@ -105,6 +105,12 @@ export const constantRoutes = [
         component: () => import('@/views/gameClient/grabNiuNiu/index'),
         name: 'GrabNiuNiu',
         meta: { title: '抢庄牛牛' }
+      },
+      {
+        path: 'report',
+        component: () => import('@/views/gameClient/grabNiuNiu/Report'),
+        name: 'GameReport',
+        meta: { title: '战报结算' }
       }
     ]
   }

@@ -1,0 +1,124 @@
+name: Deploy C++ Game Server
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    # 强烈建议将编译系统与运行系统的 OS 版本保持一致
+    # 官方文档的依赖在较新的 Ubuntu (如 22.04) 上编译较容易
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libicu-dev libbz2-dev libssl-dev git wget
+
+      - name: Cache Boost
+        id: cache-boost
+        uses: actions/cache@v3
+        with:
+          path: /usr/local/boost_1_75_0
+          key: ${{ runner.os }}-boost-1.75.0
+
+      - name: Build Boost
+        if: steps.cache-boost.outputs.cache-hit != 'true'
+        run: |
+          wget https://boostorg.jfrog.io/artifactory/main/release/1.75.0/source/boost_1_75_0.tar.gz
+          tar -xzf boost_1_75_0.tar.gz
+          cd boost_1_75_0
+          ./bootstrap.sh --prefix=/usr/local/boost_1_75_0
+          sudo ./b2 install --toolset=gcc --without-python link=static runtime-link=shared threading=multi variant=release address-model=64 -j4
+
+      - name: Cache Rabbitmq-c
+        id: cache-rabbitmq
+        uses: actions/cache@v3
+        with:
+          path: /usr/local/lib/x86_64-linux-gnu/librabbitmq*
+          key: ${{ runner.os }}-rabbitmq-c-latest
+
+      - name: Build Rabbitmq-c
+        if: steps.cache-rabbitmq.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/alanxz/rabbitmq-c.git
+          cd rabbitmq-c
+          mkdir build && cd build
+          cmake ..
+          make
+          sudo make install
+
+      - name: Install MySQL Connector C++
+        run: |
+          wget https://dev.mysql.com/get/Downloads/Connector-C++/mysql-connector-c++-8.0.33-linux-glibc2.28-x86-64bit.tar.gz
+          tar -xzf mysql-connector-c++-8.0.33-linux-glibc2.28-x86-64bit.tar.gz
+          sudo mkdir -p /usr/local/lib/cmake/mysql-concpp-8.0.33
+          sudo cp mysql-connector-c++-8.0.33-linux-glibc2.28-x86-64bit/lib64/mysql-concpp-config* /usr/local/lib/cmake/mysql-concpp-8.0.33/ || true
+          sudo cp -r mysql-connector-c++-8.0.33-linux-glibc2.28-x86-64bit/lib64/* /usr/local/lib/
+          sudo mkdir -p /usr/include/mysql-cppconn
+          sudo cp -r mysql-connector-c++-8.0.33-linux-glibc2.28-x86-64bit/include/* /usr/include/mysql-cppconn/
+
+      - name: Build Game Server
+        run: |
+          # 确保刚才编译的动态链接库能被找到
+          sudo ldconfig
+          cd server
+          mkdir build && cd build
+          cmake ..
+          make -j4
+
+      - name: Prepare Server Environment
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            mkdir -p /opt/niuma/server/bin/log
+
+      - name: Deploy Binary to Server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "server/build/Server/Server"
+          target: "/opt/niuma/server/bin/"
+          strip_components: 3
+
+      - name: Deploy Config to Server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "server/Server/server.ini"
+          target: "/opt/niuma/server/bin/"
+          strip_components: 2
+          # 如果不想覆盖现有的配置，可以移除这步或做相应处理
+
+      - name: Restart Game Server
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd /opt/niuma/server/bin/
+            chmod +x Server
+            pkill -f Server || true
+            sleep 2
+            # 运行Server
+            nohup ./Server > game.log 2>&1 &

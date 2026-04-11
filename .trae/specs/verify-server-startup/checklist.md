@@ -1,0 +1,1 @@
+- [x] Verify server startup logs to confirm RabbitMQ connection and server initialization.
